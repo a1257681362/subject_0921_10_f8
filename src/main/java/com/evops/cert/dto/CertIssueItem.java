@@ -15,4 +15,8 @@ public class CertIssueItem {
     private String idNo;
     private String subject;
     private String grade;
+    /** 有效期起（可空）。 */
+    private java.time.LocalDate validFrom;
+    /** 有效期止（可空=长期有效）。 */
+    private java.time.LocalDate validTo;
 }

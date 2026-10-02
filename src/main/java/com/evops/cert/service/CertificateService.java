@@ -178,6 +178,9 @@ public class CertificateService {
             cert.setBatchName(ctx.batchName);
             cert.setSubject(trimToNull(item.getSubject()));
             cert.setGrade(trimToNull(item.getGrade()));
+            cert.setValidFrom(item.getValidFrom());
+            cert.setValidTo(item.getValidTo());
+            validateValidity(cert.getValidFrom(), cert.getValidTo());
             cert.setIssuedAt(now);
             cert.setIssuedBy(operator);
             cert.setStatus(CertConstants.CERT_ISSUED);
@@ -224,17 +227,11 @@ public class CertificateService {
         String project = normalizeProject(request.getProjectCode());
 
         // 能对应到项目当前规则且能辨认年度/批次/流水时，把序列抬过旧号，避免新号撞旧号。
+        // 项目无规则/无生效版时旧号照样登记（findActiveVersion 返回 null，不抛错、不污染外层事务）。
+        CertNumberRuleVersion version = ruleService.findActiveVersion(project);
         CertNumberRule rule = null;
-        CertNumberRuleVersion version = null;
-        try {
-            version = ruleService.requireActiveVersion(project);
+        if (version != null) {
             rule = ruleService.getRule(version.getRuleId());
-        } catch (BusinessException e) {
-            if (!"NO_CERT_RULE_FOR_PROJECT".equals(e.getCode())
-                    && !"NO_ACTIVE_CERT_RULE_VERSION".equals(e.getCode())) {
-                throw e;
-            }
-            // 项目尚无规则/生效版：旧号照样登记，只是暂不抬序列（cert_no 唯一约束仍防精确重号）
         }
 
         Certificate cert = new Certificate();
@@ -260,6 +257,9 @@ public class CertificateService {
         }
         cert.setSubject(trimToNull(request.getSubject()));
         cert.setGrade(trimToNull(request.getGrade()));
+        cert.setValidFrom(request.getValidFrom());
+        cert.setValidTo(request.getValidTo());
+        validateValidity(cert.getValidFrom(), cert.getValidTo());
         cert.setIssuedAt(now);
         cert.setIssuedBy(operator);
         cert.setStatus(CertConstants.CERT_ISSUED);
@@ -474,6 +474,12 @@ public class CertificateService {
             row.setUpdatedBy(operator);
             row.setUpdatedAt(now);
             seqMapper.updateById(row);
+        }
+    }
+
+    private void validateValidity(LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new BusinessException("CERT_VALIDITY_RANGE", "证书有效期起不能晚于有效期止：" + from + " ~ " + to);
         }
     }
 

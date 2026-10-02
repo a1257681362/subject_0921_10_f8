@@ -326,3 +326,46 @@
   - `VERIFY_RATE_PER_MINUTE` 每分钟上限（缺省 60，0 不限），超限返回 `CERT_VERIFY_RATE_LIMITED`。下周接入先小流量，观察后再调大。
 
 > 新表 `t_cert_number_rule / t_cert_number_rule_version / t_cert_seq / t_certificate / t_certificate_revoke_record / t_cert_verify_config` 已纳入工作区快照与回退；schema 版本号 `cert-1`。
+
+## 旺季报名条件规则引擎工作区（regcond-1）
+
+把旺季报名条件从人工翻材料收口到 evops-base：**学历、年限、前置证书按级别配成核验项 → 提交时按提交时点生效的规则版本逐项比 → 不通过逐条给原因、存疑转人工 → 学员可申诉、流转全程留痕 → 合格后回写报名名册**。条件规则同样是**模块（主表）/ 版本（只追加）/ 状态（当前版本）**三段式，与等级规则、证书编号规则同一套版本模式。
+
+口径约定（也是投诉答复口径）：
+- **年限算头算尾**：从业起始日与提交日两天都计入，按 `[起始日, 提交日+1天)` 折算完整周年（另可配足月），不足一周期的零头不计。如要求满 3 周年，起始日 2023-10-03、提交日 2026-10-02 正好满足，晚一天即不满足。
+- **前置证书连有效期一起验**：提交日须落在证书 `[validFrom, validTo]` 闭区间；未登记有效期按长期有效（规则可要求必须登记，否则存疑）；已作废、科目/等级不符为硬不符；库内查无此证、姓名对不上不直接误杀，**存疑转人工**。
+- **规则变更按提交时点生效**：核验单永久记下命中的规则版本号与冻结核验项，之后规则升级不改变历史口径；发布日当天即对当天提交生效（按提交日口径）。
+- **申诉期间不重复拦截**：在办申诉（待受理/处理中）期间，该学员同一核验项的新提交记 `APPEALING` 暂不拦截；申诉通过则按**人+项目+级别+核验项**维度永久豁免（跨规则版本保持）；驳回则恢复拦截。申诉终裁前不允许正式入册。
+
+### 38. 条件规则模块（模块 + 版本 + 状态）
+
+- `POST /api/condition-rules`、`GET /api/condition-rules?projectCode=&levelCode=`、`GET /api/condition-rules/{id}`：规则按**项目+级别**建档（同项目同级别唯一，学历/年限/前置证书按级别各配一套）。
+- `POST /api/condition-rules/{ruleId}/versions`：建草稿版本，核验项 `items:[...]` 非法整批拒收；`GET .../versions`、`GET /api/condition-rules/versions/{versionId}`。
+  - 学历项 `{"itemType":"EDUCATION","requiredEducation":"JUNIOR_COLLEGE"}`，编码 `NONE/PRIMARY/JUNIOR_HIGH/SENIOR_HIGH/JUNIOR_COLLEGE/BACHELOR/MASTER/DOCTOR`，按"不低于"比较。
+  - 年限项 `{"itemType":"YEARS","minValue":3,"unit":"YEAR"}`（unit 可 `MONTH`，算头算尾）。
+  - 前置证书项 `{"itemType":"PREREQ_CERT","requiredSubject":"助考一级","requiredGrade":null,"checkValidity":true,"validityRequired":false}`。
+  - 同一类型 / 同一前置证书科目只能配一条；`name` 可空，缺省生成中文名。
+- `POST /api/condition-rules/versions/{versionId}/publish`：**DRAFT→ACTIVE**，发布即冻结核验项，同规则旧生效版自动 **DISABLED**；`POST .../disable` 人工停用（停用版不可重新发布，要改新建版本）。
+
+### 39. 提交核验（逐项比、逐条原因、存疑转人工、规则按提交时点生效）
+
+- `POST /api/qualifications/submit`：提交材料 `{batchId?,regNo,name,idNo?,projectCode?,levelCode,education,workStartDate,prereqCertNo,submittedAt?}`（`submittedAt` 缺省当天）。
+  - 取提交日项目+级别**当时生效**的规则版本逐项机器核验；每项 `PASS / FAIL / MANUAL / APPEALING`，FAIL/MANUAL 带可读中文原因与「要求/实际」对照。
+  - 汇总：有硬不符（未被申诉/豁免放行）→ `REJECTED`；无硬不符但有存疑 → `MANUAL`；全部通过 → `QUALIFIED`（`qualifiedVia=AUTO/APPEAL/MANUAL_REVIEW`）。
+  - 提交报文、命中规则版本号、逐项结果全部留档；`GET /api/qualifications/{id}`、`GET /api/qualifications/{id}/items`、`GET /api/qualifications?batchId=&status=&projectCode=&levelCode=`。
+- `POST /api/qualifications/{id}/manual-review`：存疑人工结论 `{approved,comment}`——放行即合格（`MANUAL_REVIEW`），拒收必填原因。
+- `POST /api/qualifications/{id}/enroll`：合格核验单回写报名名册（`t_registration`，备注带核验单号与规则版本号）；有在办申诉项时拒收（`QUALIFICATION_APPEAL_PENDING`）；已入册幂等。
+- 证书侧配套：发证/旧号补登可带 `validFrom/validTo`（起晚于止拒收）；前置证书核验读取该有效期。
+
+### 40. 学员申诉（流转留痕、申诉期间不重复拦截）
+
+- `POST /api/qualification-appeals`：`{checkItemId,reason,evidence?,applicant?}`（或 `{qualificationId,itemKey,...}`）对不通过/存疑项申诉；落 **SUBMITTED** 并追加 CREATE 版本，核验项转 `APPEALING`、核验单暂不拦截。
+- `POST /api/qualification-appeals/{id}/accept?comment=`：受理，SUBMITTED→REVIEWING（ACCEPT 版本）。
+- `POST /api/qualification-appeals/{id}/conclusion`：`{approved,conclusion}` 终裁——
+  - 通过（APPROVE 版本）：该项按豁免放行，核验单回算合格（`qualifiedVia=APPEAL`，记下豁免申诉单）；申诉期间其他新提交挂同一申诉的核验单一并转合格；
+  - 驳回（REJECT 版本，驳回必填意见）：恢复机器原始结论，相关核验单一并回到不通过/存疑。
+  - 终裁即站内通知学员（`COND_APPEAL_APPROVED/REJECTED`，`GET /api/notifications` 可查）。
+- 豁免按 **人（证件号优先，缺则报名号）+项目+级别+核验项键** 生效，规则升级后依然保持；已终裁项不能重复申诉，补充新材料请重新提交生成新核验单。
+- `GET /api/qualification-appeals?status=&regNo=&personKey=`、`GET /api/qualification-appeals/{id}`、`GET /api/qualification-appeals/{id}/versions`（CREATE/ACCEPT/APPROVE/REJECT 版本链）。
+
+> 新表 `t_condition_rule / t_condition_rule_version / t_registration_qualification / t_qualification_check_item / t_qualification_appeal / t_qualification_appeal_version` 已纳入工作区快照与回退；`t_certificate` 加列 `valid_from/valid_to`（老库平滑加列）；schema 版本号 `regcond-1`。

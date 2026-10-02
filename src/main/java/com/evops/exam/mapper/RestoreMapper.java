@@ -46,6 +46,12 @@ import com.evops.cert.entity.CertSeq;
 import com.evops.cert.entity.Certificate;
 import com.evops.cert.entity.CertificateRevokeRecord;
 import com.evops.cert.entity.CertVerifyConfig;
+import com.evops.regcond.entity.ConditionRule;
+import com.evops.regcond.entity.ConditionRuleVersion;
+import com.evops.regcond.entity.RegistrationQualification;
+import com.evops.regcond.entity.QualificationCheckItem;
+import com.evops.regcond.entity.QualificationAppeal;
+import com.evops.regcond.entity.QualificationAppealVersion;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -762,11 +768,11 @@ public interface RestoreMapper {
 
     @Insert("INSERT INTO t_certificate (id, cert_no, source, rule_id, rule_version_id, rule_version_no, "
             + "cert_year, cert_batch, cert_seq, holder_name, id_no, project_code, batch_id, batch_code, "
-            + "batch_name, subject, grade, issued_at, issued_by, status, revoked_at, revoked_by, "
+            + "batch_name, subject, grade, valid_from, valid_to, issued_at, issued_by, status, revoked_at, revoked_by, "
             + "revoke_reason, remark, create_by, create_time, update_by, update_time) VALUES "
             + "(#{id},#{certNo},#{source},#{ruleId},#{ruleVersionId},#{ruleVersionNo},"
             + "#{certYear},#{certBatch},#{certSeq},#{holderName},#{idNo},#{projectCode},#{batchId},"
-            + "#{batchCode},#{batchName},#{subject},#{grade},#{issuedAt},#{issuedBy},#{status},"
+            + "#{batchCode},#{batchName},#{subject},#{grade},#{validFrom},#{validTo},#{issuedAt},#{issuedBy},#{status},"
             + "#{revokedAt},#{revokedBy},#{revokeReason},#{remark},"
             + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
     void insertCertificate(Certificate c);
@@ -818,4 +824,112 @@ public interface RestoreMapper {
 
     @Update("ALTER TABLE t_cert_verify_config ALTER COLUMN id RESTART WITH ${value}")
     void restartCertVerifyConfig(@Param("value") long value);
+
+    // ============ regcond-1：报名条件规则引擎 ============
+    @Delete("DELETE FROM t_qualification_appeal_version")
+    void clearAppealVersions();
+
+    @Delete("DELETE FROM t_qualification_appeal")
+    void clearAppeals();
+
+    @Delete("DELETE FROM t_qualification_check_item")
+    void clearCheckItems();
+
+    @Delete("DELETE FROM t_registration_qualification")
+    void clearQualifications();
+
+    @Delete("DELETE FROM t_condition_rule_version")
+    void clearConditionRuleVersions();
+
+    @Delete("DELETE FROM t_condition_rule")
+    void clearConditionRules();
+
+    @Insert("INSERT INTO t_condition_rule (id, code, name, project_code, level_code, remark, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{code},#{name},#{projectCode},#{levelCode},#{remark},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertConditionRule(ConditionRule r);
+
+    @Insert("INSERT INTO t_condition_rule_version (id, rule_id, version_no, status, items, remark, "
+            + "published_by, published_at, disabled_by, disabled_at, operator, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{ruleId},#{versionNo},#{status},#{items},#{remark},"
+            + "#{publishedBy},#{publishedAt},#{disabledBy},#{disabledAt},#{operator},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertConditionRuleVersion(ConditionRuleVersion v);
+
+    @Insert("INSERT INTO t_registration_qualification (id, qualification_no, batch_id, reg_no, name, id_type, "
+            + "id_no, phone, subject, project_code, level_code, education, work_start_date, prereq_cert_no, "
+            + "rule_id, rule_version_id, rule_version_no, status, qualified_via, pass_count, fail_count, "
+            + "manual_count, has_appealing_item, waiver_appeal_id, submit_snapshot, reviewer, reviewed_at, "
+            + "review_comment, registration_id, enrolled_at, remark, operator, submitted_at, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{qualificationNo},#{batchId},#{regNo},#{name},#{idType},"
+            + "#{idNo},#{phone},#{subject},#{projectCode},#{levelCode},#{education},#{workStartDate},#{prereqCertNo},"
+            + "#{ruleId},#{ruleVersionId},#{ruleVersionNo},#{status},#{qualifiedVia},#{passCount},#{failCount},"
+            + "#{manualCount},#{hasAppealingItem},#{waiverAppealId},#{submitSnapshot},#{reviewer},#{reviewedAt},"
+            + "#{reviewComment},#{registrationId},#{enrolledAt},#{remark},#{operator},#{submittedAt},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertQualification(RegistrationQualification q);
+
+    @Insert("INSERT INTO t_qualification_check_item (id, qualification_id, item_key, item_type, item_name, "
+            + "expected, actual, result, original_result, reason, appeal_id, waiver_appeal_id, rule_version_no, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{qualificationId},#{itemKey},#{itemType},#{itemName},"
+            + "#{expected},#{actual},#{result},#{originalResult},#{reason},#{appealId},#{waiverAppealId},#{ruleVersionNo},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertCheckItem(QualificationCheckItem i);
+
+    @Insert("INSERT INTO t_qualification_appeal (id, appeal_no, qualification_id, check_item_id, project_code, "
+            + "level_code, person_key, item_key, item_type, item_name, applicant, applicant_name, reason, evidence, "
+            + "status, current_version, reviewer, conclusion, concluded_at, operator, applied_at, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{appealNo},#{qualificationId},#{checkItemId},#{projectCode},"
+            + "#{levelCode},#{personKey},#{itemKey},#{itemType},#{itemName},#{applicant},#{applicantName},"
+            + "#{reason},#{evidence},#{status},#{currentVersion},#{reviewer},#{conclusion},#{concludedAt},"
+            + "#{operator},#{appliedAt},#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertAppeal(QualificationAppeal a);
+
+    @Insert("INSERT INTO t_qualification_appeal_version (id, appeal_id, version_no, status, change_type, "
+            + "change_reason, reviewer, operator, changed_at, create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{appealId},#{versionNo},#{status},#{changeType},"
+            + "#{changeReason},#{reviewer},#{operator},#{changedAt},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertAppealVersion(QualificationAppealVersion v);
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_condition_rule")
+    long maxConditionRuleId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_condition_rule_version")
+    long maxConditionRuleVersionId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_registration_qualification")
+    long maxQualificationId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_qualification_check_item")
+    long maxCheckItemId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_qualification_appeal")
+    long maxAppealId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_qualification_appeal_version")
+    long maxAppealVersionId();
+
+    @Update("ALTER TABLE t_condition_rule ALTER COLUMN id RESTART WITH ${value}")
+    void restartConditionRule(@Param("value") long value);
+
+    @Update("ALTER TABLE t_condition_rule_version ALTER COLUMN id RESTART WITH ${value}")
+    void restartConditionRuleVersion(@Param("value") long value);
+
+    @Update("ALTER TABLE t_registration_qualification ALTER COLUMN id RESTART WITH ${value}")
+    void restartQualification(@Param("value") long value);
+
+    @Update("ALTER TABLE t_qualification_check_item ALTER COLUMN id RESTART WITH ${value}")
+    void restartCheckItem(@Param("value") long value);
+
+    @Update("ALTER TABLE t_qualification_appeal ALTER COLUMN id RESTART WITH ${value}")
+    void restartAppeal(@Param("value") long value);
+
+    @Update("ALTER TABLE t_qualification_appeal_version ALTER COLUMN id RESTART WITH ${value}")
+    void restartAppealVersion(@Param("value") long value);
 }

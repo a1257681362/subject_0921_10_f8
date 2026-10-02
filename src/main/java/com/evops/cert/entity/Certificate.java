@@ -5,6 +5,7 @@ import com.evops.common.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -35,6 +36,10 @@ public class Certificate extends BaseEntity {
     private String batchName;
     private String subject;
     private String grade;
+    /** 有效期起（可空：老证未登记/无固定起期）；报名前置证书核验连有效期一起验。 */
+    private LocalDate validFrom;
+    /** 有效期止（可空=长期有效）；报名提交日须落在 [validFrom, validTo] 闭区间内。 */
+    private LocalDate validTo;
     private LocalDateTime issuedAt;
     private String issuedBy;
     /** ISSUED 有效 / REVOKED 已作废。 */

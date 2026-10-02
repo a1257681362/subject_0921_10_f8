@@ -90,6 +90,18 @@ import com.evops.cert.mapper.CertSeqMapper;
 import com.evops.cert.mapper.CertificateMapper;
 import com.evops.cert.mapper.CertificateRevokeRecordMapper;
 import com.evops.cert.mapper.CertVerifyConfigMapper;
+import com.evops.regcond.entity.ConditionRule;
+import com.evops.regcond.entity.ConditionRuleVersion;
+import com.evops.regcond.entity.RegistrationQualification;
+import com.evops.regcond.entity.QualificationCheckItem;
+import com.evops.regcond.entity.QualificationAppeal;
+import com.evops.regcond.entity.QualificationAppealVersion;
+import com.evops.regcond.mapper.ConditionRuleMapper;
+import com.evops.regcond.mapper.ConditionRuleVersionMapper;
+import com.evops.regcond.mapper.RegistrationQualificationMapper;
+import com.evops.regcond.mapper.QualificationCheckItemMapper;
+import com.evops.regcond.mapper.QualificationAppealMapper;
+import com.evops.regcond.mapper.QualificationAppealVersionMapper;
 import com.evops.exam.mapper.AdmissionTicketMapper;
 import com.evops.exam.mapper.ExamBatchMapper;
 import com.evops.exam.mapper.ExamRoomMapper;
@@ -169,6 +181,12 @@ public class WorkspaceVersionService {
     private final CertificateMapper certificateMapper;
     private final CertificateRevokeRecordMapper certRevokeRecordMapper;
     private final CertVerifyConfigMapper certVerifyConfigMapper;
+    private final ConditionRuleMapper conditionRuleMapper;
+    private final ConditionRuleVersionMapper conditionRuleVersionMapper;
+    private final RegistrationQualificationMapper qualificationMapper;
+    private final QualificationCheckItemMapper checkItemMapper;
+    private final QualificationAppealMapper appealMapper;
+    private final QualificationAppealVersionMapper appealVersionMapper;
     private final ObjectMapper objectMapper;
     private final RestoreMapper restoreMapper;
 
@@ -220,6 +238,12 @@ public class WorkspaceVersionService {
                                    CertificateMapper certificateMapper,
                                    CertificateRevokeRecordMapper certRevokeRecordMapper,
                                    CertVerifyConfigMapper certVerifyConfigMapper,
+                                   ConditionRuleMapper conditionRuleMapper,
+                                   ConditionRuleVersionMapper conditionRuleVersionMapper,
+                                   RegistrationQualificationMapper qualificationMapper,
+                                   QualificationCheckItemMapper checkItemMapper,
+                                   QualificationAppealMapper appealMapper,
+                                   QualificationAppealVersionMapper appealVersionMapper,
                                    ObjectMapper objectMapper,
                                    RestoreMapper restoreMapper) {
         this.versionMapper = versionMapper;
@@ -270,6 +294,12 @@ public class WorkspaceVersionService {
         this.certificateMapper = certificateMapper;
         this.certRevokeRecordMapper = certRevokeRecordMapper;
         this.certVerifyConfigMapper = certVerifyConfigMapper;
+        this.conditionRuleMapper = conditionRuleMapper;
+        this.conditionRuleVersionMapper = conditionRuleVersionMapper;
+        this.qualificationMapper = qualificationMapper;
+        this.checkItemMapper = checkItemMapper;
+        this.appealMapper = appealMapper;
+        this.appealVersionMapper = appealVersionMapper;
         this.objectMapper = objectMapper;
         this.restoreMapper = restoreMapper;
     }
@@ -426,6 +456,12 @@ public class WorkspaceVersionService {
             data.put("certificates", certificateMapper.selectList(null));
             data.put("certRevokeRecords", certRevokeRecordMapper.selectList(null));
             data.put("certVerifyConfigs", certVerifyConfigMapper.selectList(null));
+            data.put("conditionRules", conditionRuleMapper.selectList(null));
+            data.put("conditionRuleVersions", conditionRuleVersionMapper.selectList(null));
+            data.put("qualifications", qualificationMapper.selectList(null));
+            data.put("qualificationCheckItems", checkItemMapper.selectList(null));
+            data.put("qualificationAppeals", appealMapper.selectList(null));
+            data.put("qualificationAppealVersions", appealVersionMapper.selectList(null));
             return objectMapper.writeValueAsString(data);
         } catch (Exception e) {
             throw new BusinessException("SNAPSHOT_FAILED", "生成工作区快照失败：" + e.getMessage());
@@ -449,6 +485,12 @@ public class WorkspaceVersionService {
         restoreMapper.clearCertRuleVersions();
         restoreMapper.clearCertRules();
         restoreMapper.clearCertVerifyConfigs();
+        restoreMapper.clearAppealVersions();
+        restoreMapper.clearAppeals();
+        restoreMapper.clearCheckItems();
+        restoreMapper.clearQualifications();
+        restoreMapper.clearConditionRuleVersions();
+        restoreMapper.clearConditionRules();
         restoreMapper.clearAbsenceStats();
         restoreMapper.clearScoreSnapshots();
         restoreMapper.clearAbsenceMarkVersions();
@@ -568,6 +610,24 @@ public class WorkspaceVersionService {
         for (CertVerifyConfig c : nullSafe(data.certVerifyConfigs)) {
             restoreMapper.insertCertVerifyConfig(c);
         }
+        for (ConditionRule r : nullSafe(data.conditionRules)) {
+            restoreMapper.insertConditionRule(r);
+        }
+        for (ConditionRuleVersion v : nullSafe(data.conditionRuleVersions)) {
+            restoreMapper.insertConditionRuleVersion(v);
+        }
+        for (RegistrationQualification q : nullSafe(data.qualifications)) {
+            restoreMapper.insertQualification(q);
+        }
+        for (QualificationCheckItem i : nullSafe(data.qualificationCheckItems)) {
+            restoreMapper.insertCheckItem(i);
+        }
+        for (QualificationAppeal a : nullSafe(data.qualificationAppeals)) {
+            restoreMapper.insertAppeal(a);
+        }
+        for (QualificationAppealVersion v : nullSafe(data.qualificationAppealVersions)) {
+            restoreMapper.insertAppealVersion(v);
+        }
         for (MixAlgorithm a : nullSafe(data.mixAlgorithms)) {
             restoreMapper.insertMixAlgorithm(a);
         }
@@ -656,6 +716,12 @@ public class WorkspaceVersionService {
         restoreMapper.restartCertificate(restoreMapper.maxCertificateId() + 1);
         restoreMapper.restartCertRevokeRecord(restoreMapper.maxCertRevokeRecordId() + 1);
         restoreMapper.restartCertVerifyConfig(restoreMapper.maxCertVerifyConfigId() + 1);
+        restoreMapper.restartConditionRule(restoreMapper.maxConditionRuleId() + 1);
+        restoreMapper.restartConditionRuleVersion(restoreMapper.maxConditionRuleVersionId() + 1);
+        restoreMapper.restartQualification(restoreMapper.maxQualificationId() + 1);
+        restoreMapper.restartCheckItem(restoreMapper.maxCheckItemId() + 1);
+        restoreMapper.restartAppeal(restoreMapper.maxAppealId() + 1);
+        restoreMapper.restartAppealVersion(restoreMapper.maxAppealVersionId() + 1);
         restoreMapper.restartMixAlgorithm(restoreMapper.maxMixAlgorithmId() + 1);
         restoreMapper.restartMixVersion(restoreMapper.maxMixVersionId() + 1);
         restoreMapper.restartArrangementRun(restoreMapper.maxArrangementRunId() + 1);
@@ -786,5 +852,11 @@ public class WorkspaceVersionService {
         public List<Certificate> certificates;
         public List<CertificateRevokeRecord> certRevokeRecords;
         public List<CertVerifyConfig> certVerifyConfigs;
+        public List<ConditionRule> conditionRules;
+        public List<ConditionRuleVersion> conditionRuleVersions;
+        public List<RegistrationQualification> qualifications;
+        public List<QualificationCheckItem> qualificationCheckItems;
+        public List<QualificationAppeal> qualificationAppeals;
+        public List<QualificationAppealVersion> qualificationAppealVersions;
     }
 }

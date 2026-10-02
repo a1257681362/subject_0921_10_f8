@@ -159,27 +159,32 @@ public class CertNumberRuleService {
      */
     @Transactional(readOnly = true)
     public CertNumberRuleVersion requireActiveVersion(String projectCode) {
+        CertNumberRuleVersion active = findActiveVersion(projectCode);
+        if (active == null) {
+            String project = normalizeProject(projectCode);
+            throw new BusinessException("NO_ACTIVE_CERT_RULE_VERSION",
+                    "项目 " + project + " 当前没有生效的证书编号规则版本，请先建档并发布草稿");
+        }
+        return active;
+    }
+
+    /**
+     * 查项目当前生效版本，无规则 / 无生效版 / 多规则时返回 null（不抛错）。
+     * 故意不加 @Transactional：手工旧号补登等外层事务要靠 null 走"无规则也登记"分支，
+     * 若此处由声明式事务把外层事务标成 rollback-only，外层将 UnexpectedRollback。
+     */
+    public CertNumberRuleVersion findActiveVersion(String projectCode) {
         String project = normalizeProject(projectCode);
         List<CertNumberRule> rules = ruleMapper.selectList(
                 new QueryWrapper<CertNumberRule>().eq("project_code", project).orderByDesc("id"));
-        if (rules.isEmpty()) {
-            throw new BusinessException("NO_CERT_RULE_FOR_PROJECT",
-                    "项目尚未配置证书编号规则：" + project + "，请先建档并发布规则版本");
+        if (rules.size() != 1) {
+            return null;
         }
-        if (rules.size() > 1) {
-            throw new BusinessException("MULTIPLE_CERT_RULES",
-                    "项目 " + project + " 存在多条编号规则，无法唯一确定发号口径，请明确指定规则");
-        }
-        CertNumberRuleVersion active = versionMapper.selectOne(new QueryWrapper<CertNumberRuleVersion>()
+        return versionMapper.selectOne(new QueryWrapper<CertNumberRuleVersion>()
                 .eq("rule_id", rules.get(0).getId())
                 .eq("status", CertConstants.VERSION_ACTIVE)
                 .orderByDesc("id")
                 .last("LIMIT 1"));
-        if (active == null) {
-            throw new BusinessException("NO_ACTIVE_CERT_RULE_VERSION",
-                    "编号规则 " + rules.get(0).getCode() + " 尚无生效版本，请先发布草稿");
-        }
-        return active;
     }
 
     // ---------- 发号参数校验 / 序列化 ----------
