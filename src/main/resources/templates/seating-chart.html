@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>座次表 - <span th:text="${chart.batchCode}">批次</span></title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", "SimSun", sans-serif; color: #000; margin: 0; padding: 24px; }
+        .toolbar { margin-bottom: 16px; }
+        .toolbar button { padding: 8px 20px; font-size: 14px; cursor: pointer; }
+        h1 { font-size: 20px; margin: 0 0 8px; text-align: center; }
+        .meta { font-size: 13px; margin-bottom: 12px; }
+        .meta span { display: inline-block; margin-right: 18px; }
+        .room-sheet { page-break-after: always; margin-bottom: 24px; }
+        .room-sheet:last-child { page-break-after: auto; }
+        .room-title { font-size: 16px; font-weight: bold; margin: 12px 0 8px; border-left: 4px solid #000; padding-left: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border: 1px solid #000; padding: 6px 8px; text-align: center; }
+        th { background: #f0f0f0; }
+        td.name { text-align: left; }
+        td.empty { color: #999; }
+        .school { font-size: 12px; color: #333; }
+        .footer-note { margin-top: 10px; font-size: 12px; color: #444; }
+        .sign { margin-top: 24px; font-size: 13px; }
+        .sign span { display: inline-block; margin-right: 60px; }
+        @media print {
+            .toolbar { display: none; }
+            body { padding: 0; }
+            .room-sheet { page-break-after: always; }
+        }
+    </style>
+</head>
+<body>
+<div class="toolbar">
+    <button onclick="window.print()">打印 / 另存为 PDF</button>
+</div>
+
+<h1>考 试 座 次 表</h1>
+<div class="meta">
+    <span>批次：<b th:text="${chart.batchCode} + ' ' + ${chart.batchName}">批次</b></span>
+    <span>考点：<b th:text="${chart.siteName}">考点</b></span>
+    <span th:if="${chart.subject != null}">科目：<b th:text="${chart.subject}">科目</b></span>
+    <span th:if="${chart.examDate != null}">考试日期：<b th:text="${chart.examDate}">日期</b></span>
+</div>
+<div class="meta">
+    <span>应考人数：<b th:text="${chart.totalCount}">0</b></span>
+    <span>考场数：<b th:text="${#lists.size(chart.sheets)}">0</b></span>
+    <span>混编版本：<b th:text="${chart.mixVersionNo}">版本</b></span>
+    <span>种子：<b th:text="${chart.seed}">种子</b></span>
+    <span>同校相邻：<b th:text="${chart.sameSchoolAdjacentCount}">0</b> 对（巡考抽查口径）</span>
+</div>
+
+<div class="room-sheet" th:each="sheet : ${chart.sheets}">
+    <div class="room-title">
+        考场号：<span th:text="${sheet.roomNo}">考场</span>
+        <span th:if="${sheet.building != null}" style="font-weight:normal; font-size:13px;">
+            （<span th:text="${sheet.building}">楼栋</span><span th:if="${sheet.floorNo != null}"> 第 <span th:text="${sheet.floorNo}">层</span> 层</span>）
+        </span>
+    </div>
+    <table>
+        <thead>
+        <tr>
+            <th style="width:10%;">座位号</th>
+            <th style="width:20%;">准考证号</th>
+            <th style="width:14%;">报名号</th>
+            <th style="width:14%;">姓名</th>
+            <th style="width:28%;">所属学校</th>
+            <th style="width:14%;">签到</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="row : ${sheet.rows}">
+            <td th:text="${row.seatNo}">1</td>
+            <td th:text="${row.empty ? '' : row.ticketNo}" th:classappend="${row.empty} ? 'empty' : ''">证号</td>
+            <td th:text="${row.empty ? '' : row.regNo}" th:classappend="${row.empty} ? 'empty' : ''">报名号</td>
+            <td class="name" th:text="${row.empty ? '空位' : row.name}"
+                th:classappend="${row.empty} ? 'empty' : ''">姓名</td>
+            <td class="school" th:text="${row.empty ? '' : (row.school != null ? row.school : '未填学校')}">学校</td>
+            <td></td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="sign">
+    <span>监考人签字：____________</span>
+    <span>巡考人签字：____________</span>
+    <span>日期：____________</span>
+</div>
+<div class="footer-note">
+    说明：本座次表由系统按同校错开混编算法生成，每个考场单独一页；如对座次有疑问，凭批次、混编版本与种子可复现核对。
+</div>
+</body>
+</html>
