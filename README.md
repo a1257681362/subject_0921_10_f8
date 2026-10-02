@@ -326,3 +326,42 @@
   - `VERIFY_RATE_PER_MINUTE` 每分钟上限（缺省 60，0 不限），超限返回 `CERT_VERIFY_RATE_LIMITED`。下周接入先小流量，观察后再调大。
 
 > 新表 `t_cert_number_rule / t_cert_number_rule_version / t_cert_seq / t_certificate / t_certificate_revoke_record / t_cert_verify_config` 已纳入工作区快照与回退；schema 版本号 `cert-1`。
+
+## 旺季报名条件规则引擎工作区（regcond-1）
+
+解决"旺季报名积压几百件、人工翻材料眼花、投诉接连"：把学历、年限、前置证书按**项目+报考级别**配成核验项挂进 evops-base——提交时逐项机器比对，不通过逐条给中文原因，机器判不准的存疑转人工；**规则变更按提交时点生效**（新发布不翻旧账）；学员可申诉、流转全程留痕，**申诉期间不重复拦截**。条件规则分**模块（主表）/ 版本（只追加）/ 状态（当前版本）**三段，与等级规则、证书编号规则同一套模式。
+
+口径约定：
+- **年限算头算尾**：起算日（工作起始日或前一证书取得日）为第 1 天含头，提交日当天计入含尾；满 N 周年按"对日"判定——提交日到达起算日 N 周年对日即算满 N 年（如 2020-10-02 起算、2026-10-02 提交恰好满 6 周年）。
+- **前置证书连有效期一起验**：提交日须落在有效期内，**到期日当天仍有效（含当日）**，次日起算失效；到期日取证书自带到期日，其次规则规定 `validYears` 按签发日推算，两者都没有则存疑转人工。
+
+### 38. 条件规则模块（模块 + 版本 + 状态）
+
+- `POST /api/reg-condition-rules`、`GET /api/reg-condition-rules?projectCode=&levelCode=`、`GET /api/reg-condition-rules/{ruleId}`：规则按**项目+级别**建档（同项目同级别唯一），`yearsBasis` 选年限起算口径 `WORK_START_DATE 工作起始日 / LAST_CERT_DATE 前一证书取得日`（缺省工作起始日）。
+- `POST /api/reg-condition-rules/{ruleId}/versions`：建草稿版本，提交核验项配置
+  `{"education":{"requiredLevel":"BACHELOR"},"years":{"minYears":6},"priorCerts":[{"itemKey":"P1","certName":"安全合格证","checkValidity":true,"validYears":3}]}`。
+  - 学历层次 `HIGH_SCHOOL 高中/中专 / JUNIOR_COLLEGE 大专 / BACHELOR 本科 / MASTER 硕士 / DOCTOR 博士`，实际层次达到或超过要求即通过；
+  - 前置证书按 `itemKey` 与学员材料对应，同版本内 key 不可重复；三类核验项至少启用一项（防止误配成无条件放行），非法配置整批拒收。
+- `GET .../versions`、`GET /api/reg-condition-rules/versions/{versionId}`（返回冻结配置摘要）。
+- `POST /api/reg-condition-rules/versions/{versionId}/publish`：**DRAFT→ACTIVE**，发布即冻结核验项 JSON，同规则旧生效版自动 **DISABLED**；`POST .../disable` 人工停用。无生效版本时提交报 `NO_ACTIVE_REG_RULE_VERSION`，不放行也不乱拦。
+
+### 39. 报名提交（两步预检；逐项比、逐条原因、存疑转人工）
+
+- `POST /api/reg-conditions/submit/preview` → `POST /api/reg-conditions/submit`：
+  请求 `{"submissions":[{regNo,name,batchId?|projectCode?,levelCode,educationLevel,workStartDate,lastCertDate,submittedAt?,priorCerts:[{itemKey,certNo?,external?,issuedDate?,expiresDate?,documentDoubt?,holderName?,idNo?}]}]}`。
+  - 规则按**提交时点**取项目+级别的 ACTIVE 版本，提交单永久冻结 `ruleVersionNo`；给 `batchId` 时项目取批次项目并关联名册。
+  - 逐项结论 **PASS / FAIL / DOUBT**：有明确 FAIL 即整体 **FAIL**（逐条中文原因，含实际值 vs 要求值）；无 FAIL 有 DOUBT 落 **MANUAL_PENDING** 转人工（学历写法机读不认、缺起算日、证书编号库内查无、材料标记存疑、有效期无法判定等）；全 PASS 自动通过。
+  - 内部证书给 `certNo` 即查库：查无→存疑，已作废（含作废原因）/持证人不符/证件号不符→FAIL；外部证书按填报签发日/到期日核验；签发日晚于提交日→FAIL（报名时尚未取得）。
+  - 预检逐人列可受理/不通过/转人工/申诉跳过/结构性错误；执行时任一结构性问题（级别无规则、清单内同人同级别重复）**整批拒收、不落半条**；预检与执行同一口径只评估一次，防止两趟之间发布规则导致版本漂移。
+- 提交号 `BM + yyyyMMdd + 4 位流水`；`GET /api/reg-conditions/submissions?batchId=&regNo=&levelCode=&status=`、`GET .../submissions/{id}`、`.../by-no/{submissionNo}`。
+- `GET /api/reg-conditions/submissions/{id}/checks`：逐项核验结果、逐条原因与机器初判明细 JSON；`GET .../events`：提交/自动通过/转人工/人工复核/申诉改判事件链。
+- `POST /api/reg-conditions/submissions/{id}/manual-review`：`{"outcome":"PASS|FAIL","comment":"...","itemResults?":[{"checkId","result","reason"}]}` 人工复核存疑单（可逐项改判），只允许 MANUAL_PENDING，复核事件追加留痕。
+
+### 40. 学员申诉（流转留痕；申诉期间不重复拦截）
+
+- `POST /api/reg-condition-appeals`：`{"submissionId":... 或 "submissionNo":"...","reason":"..."}`。仅 **FAIL / REJECTED_FAIL** 可申诉；同一提交单同时刻仅一条 PENDING（`APPEAL_IN_PROGRESS`），历史申诉只追加。
+- **申诉期间不重复拦截**：PENDING 期间该报名号+批次+级别再次提交，预检/执行均直接跳过并回申诉单号，不再产生新的失败拦截。
+- `POST /api/reg-condition-appeals/{id}/conclusion`：`{"approved":true|false,"conclusion":"..."}`。成立→提交单改判 **APPEAL_PASS**（机器初判与逐项原因原样保留可追溯）；驳回→**REJECTED_FAIL** 维持拦截，驳回后再次提交恢复正常核验、且可凭新材料再次申诉。
+- 申诉单与提交单各记一条事件链（APPLY/CONCLUDE 与 APPEAL_START/APPEAL_APPROVED|REJECTED）；`GET /api/reg-condition-appeals?regNo=&status=&batchId=`、`GET /api/reg-condition-appeals/{id}`、`GET .../{id}/events`。
+
+> 新表 `t_reg_condition_rule / t_reg_condition_rule_version / t_reg_condition_submission / t_reg_condition_check / t_reg_submission_event / t_reg_appeal / t_reg_appeal_event` 已纳入工作区快照与回退；schema 版本号 `regcond-1`。

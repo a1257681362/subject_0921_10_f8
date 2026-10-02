@@ -90,6 +90,20 @@ import com.evops.cert.mapper.CertSeqMapper;
 import com.evops.cert.mapper.CertificateMapper;
 import com.evops.cert.mapper.CertificateRevokeRecordMapper;
 import com.evops.cert.mapper.CertVerifyConfigMapper;
+import com.evops.regcond.entity.RegAppeal;
+import com.evops.regcond.entity.RegAppealEvent;
+import com.evops.regcond.entity.RegConditionCheck;
+import com.evops.regcond.entity.RegConditionRule;
+import com.evops.regcond.entity.RegConditionRuleVersion;
+import com.evops.regcond.entity.RegConditionSubmission;
+import com.evops.regcond.entity.RegSubmissionEvent;
+import com.evops.regcond.mapper.RegAppealEventMapper;
+import com.evops.regcond.mapper.RegAppealMapper;
+import com.evops.regcond.mapper.RegConditionCheckMapper;
+import com.evops.regcond.mapper.RegConditionRuleMapper;
+import com.evops.regcond.mapper.RegConditionRuleVersionMapper;
+import com.evops.regcond.mapper.RegConditionSubmissionMapper;
+import com.evops.regcond.mapper.RegSubmissionEventMapper;
 import com.evops.exam.mapper.AdmissionTicketMapper;
 import com.evops.exam.mapper.ExamBatchMapper;
 import com.evops.exam.mapper.ExamRoomMapper;
@@ -169,6 +183,13 @@ public class WorkspaceVersionService {
     private final CertificateMapper certificateMapper;
     private final CertificateRevokeRecordMapper certRevokeRecordMapper;
     private final CertVerifyConfigMapper certVerifyConfigMapper;
+    private final RegConditionRuleMapper regConditionRuleMapper;
+    private final RegConditionRuleVersionMapper regConditionRuleVersionMapper;
+    private final RegConditionSubmissionMapper regConditionSubmissionMapper;
+    private final RegConditionCheckMapper regConditionCheckMapper;
+    private final RegSubmissionEventMapper regSubmissionEventMapper;
+    private final RegAppealMapper regAppealMapper;
+    private final RegAppealEventMapper regAppealEventMapper;
     private final ObjectMapper objectMapper;
     private final RestoreMapper restoreMapper;
 
@@ -220,6 +241,13 @@ public class WorkspaceVersionService {
                                    CertificateMapper certificateMapper,
                                    CertificateRevokeRecordMapper certRevokeRecordMapper,
                                    CertVerifyConfigMapper certVerifyConfigMapper,
+                                   RegConditionRuleMapper regConditionRuleMapper,
+                                   RegConditionRuleVersionMapper regConditionRuleVersionMapper,
+                                   RegConditionSubmissionMapper regConditionSubmissionMapper,
+                                   RegConditionCheckMapper regConditionCheckMapper,
+                                   RegSubmissionEventMapper regSubmissionEventMapper,
+                                   RegAppealMapper regAppealMapper,
+                                   RegAppealEventMapper regAppealEventMapper,
                                    ObjectMapper objectMapper,
                                    RestoreMapper restoreMapper) {
         this.versionMapper = versionMapper;
@@ -270,6 +298,13 @@ public class WorkspaceVersionService {
         this.certificateMapper = certificateMapper;
         this.certRevokeRecordMapper = certRevokeRecordMapper;
         this.certVerifyConfigMapper = certVerifyConfigMapper;
+        this.regConditionRuleMapper = regConditionRuleMapper;
+        this.regConditionRuleVersionMapper = regConditionRuleVersionMapper;
+        this.regConditionSubmissionMapper = regConditionSubmissionMapper;
+        this.regConditionCheckMapper = regConditionCheckMapper;
+        this.regSubmissionEventMapper = regSubmissionEventMapper;
+        this.regAppealMapper = regAppealMapper;
+        this.regAppealEventMapper = regAppealEventMapper;
         this.objectMapper = objectMapper;
         this.restoreMapper = restoreMapper;
     }
@@ -426,6 +461,13 @@ public class WorkspaceVersionService {
             data.put("certificates", certificateMapper.selectList(null));
             data.put("certRevokeRecords", certRevokeRecordMapper.selectList(null));
             data.put("certVerifyConfigs", certVerifyConfigMapper.selectList(null));
+            data.put("regConditionRules", regConditionRuleMapper.selectList(null));
+            data.put("regConditionRuleVersions", regConditionRuleVersionMapper.selectList(null));
+            data.put("regConditionSubmissions", regConditionSubmissionMapper.selectList(null));
+            data.put("regConditionChecks", regConditionCheckMapper.selectList(null));
+            data.put("regSubmissionEvents", regSubmissionEventMapper.selectList(null));
+            data.put("regAppeals", regAppealMapper.selectList(null));
+            data.put("regAppealEvents", regAppealEventMapper.selectList(null));
             return objectMapper.writeValueAsString(data);
         } catch (Exception e) {
             throw new BusinessException("SNAPSHOT_FAILED", "生成工作区快照失败：" + e.getMessage());
@@ -443,6 +485,13 @@ public class WorkspaceVersionService {
         // 先清空业务表（版本表本身不动），再按快照原样写回。
         // 用显式带主键的原生 INSERT：准考证、成绩等表的外键依赖原始 id，
         // H2 的 GENERATED BY DEFAULT 允许指定 id 插入。
+        restoreMapper.clearRegAppealEvents();
+        restoreMapper.clearRegAppeals();
+        restoreMapper.clearRegSubmissionEvents();
+        restoreMapper.clearRegConditionChecks();
+        restoreMapper.clearRegConditionSubmissions();
+        restoreMapper.clearRegConditionRuleVersions();
+        restoreMapper.clearRegConditionRules();
         restoreMapper.clearCertRevokeRecords();
         restoreMapper.clearCertificates();
         restoreMapper.clearCertSeqs();
@@ -568,6 +617,27 @@ public class WorkspaceVersionService {
         for (CertVerifyConfig c : nullSafe(data.certVerifyConfigs)) {
             restoreMapper.insertCertVerifyConfig(c);
         }
+        for (RegConditionRule r : nullSafe(data.regConditionRules)) {
+            restoreMapper.insertRegConditionRule(r);
+        }
+        for (RegConditionRuleVersion v : nullSafe(data.regConditionRuleVersions)) {
+            restoreMapper.insertRegConditionRuleVersion(v);
+        }
+        for (RegConditionSubmission s : nullSafe(data.regConditionSubmissions)) {
+            restoreMapper.insertRegConditionSubmission(s);
+        }
+        for (RegConditionCheck c : nullSafe(data.regConditionChecks)) {
+            restoreMapper.insertRegConditionCheck(c);
+        }
+        for (RegSubmissionEvent e : nullSafe(data.regSubmissionEvents)) {
+            restoreMapper.insertRegSubmissionEvent(e);
+        }
+        for (RegAppeal a : nullSafe(data.regAppeals)) {
+            restoreMapper.insertRegAppeal(a);
+        }
+        for (RegAppealEvent e : nullSafe(data.regAppealEvents)) {
+            restoreMapper.insertRegAppealEvent(e);
+        }
         for (MixAlgorithm a : nullSafe(data.mixAlgorithms)) {
             restoreMapper.insertMixAlgorithm(a);
         }
@@ -656,6 +726,13 @@ public class WorkspaceVersionService {
         restoreMapper.restartCertificate(restoreMapper.maxCertificateId() + 1);
         restoreMapper.restartCertRevokeRecord(restoreMapper.maxCertRevokeRecordId() + 1);
         restoreMapper.restartCertVerifyConfig(restoreMapper.maxCertVerifyConfigId() + 1);
+        restoreMapper.restartRegConditionRule(restoreMapper.maxRegConditionRuleId() + 1);
+        restoreMapper.restartRegConditionRuleVersion(restoreMapper.maxRegConditionRuleVersionId() + 1);
+        restoreMapper.restartRegConditionSubmission(restoreMapper.maxRegConditionSubmissionId() + 1);
+        restoreMapper.restartRegConditionCheck(restoreMapper.maxRegConditionCheckId() + 1);
+        restoreMapper.restartRegSubmissionEvent(restoreMapper.maxRegSubmissionEventId() + 1);
+        restoreMapper.restartRegAppeal(restoreMapper.maxRegAppealId() + 1);
+        restoreMapper.restartRegAppealEvent(restoreMapper.maxRegAppealEventId() + 1);
         restoreMapper.restartMixAlgorithm(restoreMapper.maxMixAlgorithmId() + 1);
         restoreMapper.restartMixVersion(restoreMapper.maxMixVersionId() + 1);
         restoreMapper.restartArrangementRun(restoreMapper.maxArrangementRunId() + 1);
@@ -786,5 +863,12 @@ public class WorkspaceVersionService {
         public List<Certificate> certificates;
         public List<CertificateRevokeRecord> certRevokeRecords;
         public List<CertVerifyConfig> certVerifyConfigs;
+        public List<RegConditionRule> regConditionRules;
+        public List<RegConditionRuleVersion> regConditionRuleVersions;
+        public List<RegConditionSubmission> regConditionSubmissions;
+        public List<RegConditionCheck> regConditionChecks;
+        public List<RegSubmissionEvent> regSubmissionEvents;
+        public List<RegAppeal> regAppeals;
+        public List<RegAppealEvent> regAppealEvents;
     }
 }

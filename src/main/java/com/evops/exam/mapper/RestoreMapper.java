@@ -46,6 +46,13 @@ import com.evops.cert.entity.CertSeq;
 import com.evops.cert.entity.Certificate;
 import com.evops.cert.entity.CertificateRevokeRecord;
 import com.evops.cert.entity.CertVerifyConfig;
+import com.evops.regcond.entity.RegAppeal;
+import com.evops.regcond.entity.RegAppealEvent;
+import com.evops.regcond.entity.RegConditionCheck;
+import com.evops.regcond.entity.RegConditionRule;
+import com.evops.regcond.entity.RegConditionRuleVersion;
+import com.evops.regcond.entity.RegConditionSubmission;
+import com.evops.regcond.entity.RegSubmissionEvent;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -60,6 +67,28 @@ import org.apache.ibatis.annotations.Update;
  */
 @Mapper
 public interface RestoreMapper {
+
+    // ============ regcond-1：旺季报名条件规则引擎 ============
+    @Delete("DELETE FROM t_reg_appeal_event")
+    void clearRegAppealEvents();
+
+    @Delete("DELETE FROM t_reg_appeal")
+    void clearRegAppeals();
+
+    @Delete("DELETE FROM t_reg_submission_event")
+    void clearRegSubmissionEvents();
+
+    @Delete("DELETE FROM t_reg_condition_check")
+    void clearRegConditionChecks();
+
+    @Delete("DELETE FROM t_reg_condition_submission")
+    void clearRegConditionSubmissions();
+
+    @Delete("DELETE FROM t_reg_condition_rule_version")
+    void clearRegConditionRuleVersions();
+
+    @Delete("DELETE FROM t_reg_condition_rule")
+    void clearRegConditionRules();
 
     @Delete("DELETE FROM t_final_conclusion")
     void clearConclusions();
@@ -783,6 +812,59 @@ public interface RestoreMapper {
             + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
     void insertCertVerifyConfig(CertVerifyConfig c);
 
+    @Insert("INSERT INTO t_reg_condition_rule (id, code, name, project_code, level_code, years_basis, remark, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{code},#{name},#{projectCode},#{levelCode},#{yearsBasis},#{remark},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegConditionRule(RegConditionRule r);
+
+    @Insert("INSERT INTO t_reg_condition_rule_version (id, rule_id, version_no, status, items_config, remark, "
+            + "published_by, published_at, disabled_by, disabled_at, operator, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{ruleId},#{versionNo},#{status},#{itemsConfig},#{remark},"
+            + "#{publishedBy},#{publishedAt},#{disabledBy},#{disabledAt},#{operator},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegConditionRuleVersion(RegConditionRuleVersion v);
+
+    @Insert("INSERT INTO t_reg_condition_submission (id, submission_no, project_code, level_code, batch_id, "
+            + "registration_id, reg_no, name, submitted_at, rule_id, rule_version_id, rule_version_no, status, "
+            + "fail_count, doubt_count, reviewed_by, reviewed_at, review_comment, manual_outcome, operator, "
+            + "remark, create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{submissionNo},#{projectCode},#{levelCode},#{batchId},"
+            + "#{registrationId},#{regNo},#{name},#{submittedAt},#{ruleId},#{ruleVersionId},#{ruleVersionNo},"
+            + "#{status},#{failCount},#{doubtCount},#{reviewedBy},#{reviewedAt},#{reviewComment},"
+            + "#{manualOutcome},#{operator},#{remark},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegConditionSubmission(RegConditionSubmission s);
+
+    @Insert("INSERT INTO t_reg_condition_check (id, submission_id, item_type, item_key, item_label, result, "
+            + "reason, manual_result, manual_reason, reviewer, reviewed_at, detail_json, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{submissionId},#{itemType},#{itemKey},#{itemLabel},#{result},"
+            + "#{reason},#{manualResult},#{manualReason},#{reviewer},#{reviewedAt},#{detailJson},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegConditionCheck(RegConditionCheck c);
+
+    @Insert("INSERT INTO t_reg_submission_event (id, submission_id, action, from_status, to_status, detail, "
+            + "operator, event_at, create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{submissionId},#{action},#{fromStatus},#{toStatus},#{detail},"
+            + "#{operator},#{eventAt},#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegSubmissionEvent(RegSubmissionEvent e);
+
+    @Insert("INSERT INTO t_reg_appeal (id, appeal_no, submission_id, project_code, level_code, batch_id, reg_no, "
+            + "name, reason, appellant, applied_at, status, conclusion, reviewer, reviewed_at, "
+            + "create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{appealNo},#{submissionId},#{projectCode},#{levelCode},#{batchId},#{regNo},"
+            + "#{name},#{reason},#{appellant},#{appliedAt},#{status},#{conclusion},#{reviewer},#{reviewedAt},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegAppeal(RegAppeal a);
+
+    @Insert("INSERT INTO t_reg_appeal_event (id, appeal_id, action, from_status, to_status, detail, operator, "
+            + "event_at, create_by, create_time, update_by, update_time) VALUES "
+            + "(#{id},#{appealId},#{action},#{fromStatus},#{toStatus},#{detail},#{operator},#{eventAt},"
+            + "#{createBy},#{createTime},#{updateBy},#{updateTime})")
+    void insertRegAppealEvent(RegAppealEvent e);
+
     @Select("SELECT COALESCE(MAX(id),0) FROM t_cert_number_rule")
     long maxCertRuleId();
 
@@ -801,6 +883,27 @@ public interface RestoreMapper {
     @Select("SELECT COALESCE(MAX(id),0) FROM t_cert_verify_config")
     long maxCertVerifyConfigId();
 
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_condition_rule")
+    long maxRegConditionRuleId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_condition_rule_version")
+    long maxRegConditionRuleVersionId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_condition_submission")
+    long maxRegConditionSubmissionId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_condition_check")
+    long maxRegConditionCheckId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_submission_event")
+    long maxRegSubmissionEventId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_appeal")
+    long maxRegAppealId();
+
+    @Select("SELECT COALESCE(MAX(id),0) FROM t_reg_appeal_event")
+    long maxRegAppealEventId();
+
     @Update("ALTER TABLE t_cert_number_rule ALTER COLUMN id RESTART WITH ${value}")
     void restartCertRule(@Param("value") long value);
 
@@ -818,4 +921,25 @@ public interface RestoreMapper {
 
     @Update("ALTER TABLE t_cert_verify_config ALTER COLUMN id RESTART WITH ${value}")
     void restartCertVerifyConfig(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_condition_rule ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegConditionRule(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_condition_rule_version ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegConditionRuleVersion(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_condition_submission ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegConditionSubmission(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_condition_check ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegConditionCheck(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_submission_event ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegSubmissionEvent(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_appeal ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegAppeal(@Param("value") long value);
+
+    @Update("ALTER TABLE t_reg_appeal_event ALTER COLUMN id RESTART WITH ${value}")
+    void restartRegAppealEvent(@Param("value") long value);
 }
